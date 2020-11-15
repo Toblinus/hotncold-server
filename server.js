@@ -19,16 +19,15 @@ wss.on('connection', (ws) => {
         try {
             obj = JSON.parse(message);
         } catch {
-            ws.send(DEFAULT_ERROR_SOKET);
             return;
         }
 
         if(!obj.hasOwnProperty('type') || !obj.hasOwnProperty('args')){
-            ws.send(DEFAULT_ERROR_SOKET);
             return;
         }
 
         let roomToken = "";
+        let nick = "";
         switch(obj.type){
             case 'createRoom':
                 const crypto = require('crypto');   
@@ -41,25 +40,34 @@ wss.on('connection', (ws) => {
                 ws.send(JSON.stringify({type: "run-game", room: roomToken, isoper: true}));
                 break;
             
-            case 'joinRoom':
-                roomToken = obj.args[0];
-                let nick = obj.args[1] || "Unknown";
+            case 'joinToRoom':
+
+                roomToken = obj.args[1];
+                nick = obj.args[0] || "Unknown";
                 if(roomToken == "" || 
                     !clients.hasOwnProperty(roomToken) || 
                     clients[roomToken].lenght >= 2){
 
-                    ws.send(DEFAULT_ERROR_SOKET);
+                    return;
                 }
 
                 clients[roomToken].push(ws);
-                clients[roomToken][0].send(JSON.stringify({type: "msg", data: [nick + " join"]}));
-                clients[roomToken][1].send(JSON.stringify({type: "join", data: [roomToken]}));
+                clients[roomToken][0].send(JSON.stringify({type: "msg", msg: nick + " join"}));
+                clients[roomToken][1].send(JSON.stringify({type: "run-game", room: roomToken, isoper: false}));
                 break;
            
+            case 'msg':
+
+                roomToken = obj.args[1];
+                nick = obj.args[0] || "Unknown";
+                if(roomToken == "" || !clients.hasOwnProperty(roomToken)){
+                    return;
+                }
                 
-            default:
-                ws.send(DEFAULT_ERROR_SOKET);
-                return;
+                const client = clients[roomToken].find(item => item.isOperator !== ws.isOperator);
+
+                client.send(JSON.stringify({type: "msg", msg: obj.args[2]}));
+                break;
         }
     });
     // if(clients1 == null){
